@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic BG Remover</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --blue: #3b82f6; }
+        body { background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { background: var(--card); padding: 2rem; border-radius: 1rem; width: 100%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+        .upload-area { border: 2px dashed #475569; padding: 2rem; border-radius: 0.75rem; cursor: pointer; display: block; margin-bottom: 1rem; background: #0f172a; }
+        .upload-area:hover { border-color: var(--blue); }
+        button { width: 100%; padding: 0.75rem; border: none; border-radius: 0.5rem; font-weight: bold; cursor: pointer; margin-top: 0.5rem; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+        .btn-blue { background: var(--blue); }
+        .btn-green { background: #16a34a; }
+        .btn-gray { background: #334155; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .hidden { display: none !important; }
+        img { max-width: 100%; border-radius: 0.5rem; margin-top: 10px; }
+        .checkerboard { background-image: url('https://upload.wikimedia.org/wikipedia/commons/2/23/Checkerboard_pattern.svg'); background-size: cover; }
+        #status { background: rgba(59,130,246,0.1); color: #93c5fd; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid rgba(59,130,246,0.2); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 style="margin-top:0; color: #60a5fa;">AI BG Remover</h1>
+
+        <label class="upload-area">
+            <i class="fas fa-image" style="font-size: 2rem; color: #64748b;"></i>
+            <div style="color: #94a3b8; margin-top: 10px;">Pilih atau Taruh Foto</div>
+            <input type="file" id="imageInput" accept="image/*" class="hidden">
+        </label>
+
+        <div id="status" class="hidden">
+            <i class="fas fa-spinner fa-spin"></i> <span id="statusText">Memproses...</span>
+        </div>
+
+        <div id="resultArea" class="hidden" style="margin-bottom: 1.5rem;">
+            <img id="resultImage" class="checkerboard">
+        </div>
+
+        <button id="processBtn" class="btn-blue" disabled>Mulai Hapus Background</button>
+
+        <div id="actions" class="hidden" style="display: flex; gap: 10px; margin-top: 10px;">
+            <button id="dlBtn" class="btn-green" style="flex:1">Download</button>
+            <button id="saveBtn" class="btn-gray" style="flex:1">Simpan ke DB</button>
+        </div>
+        <p id="dbMsg" style="font-size: 0.75rem; color: #94a3b8; margin-top: 10px;"></p>
+    </div>
+
+    <script type="module">
+        import imglyRemoveBackground from './imgly-background-removal.min.js';
+
+        let currentBlob = null;
+        let currentFileName = "";
+        const input = document.getElementById('imageInput');
+        const processBtn = document.getElementById('processBtn');
+        const status = document.getElementById('status');
+        const actions = document.getElementById('actions');
+
+        input.onchange = (e) => {
+            if (e.target.files[0]) {
+                currentFileName = e.target.files[0].name;
+                processBtn.disabled = false;
+                processBtn.textContent = "Proses " + currentFileName;
+            }
+        };
+
+        processBtn.onclick = async () => {
+            status.classList.remove('hidden');
+            processBtn.disabled = true;
+            
+            try {
+                // Konfigurasi menggunakan jalur root website kamu
+                const config = { publicPath: window.location.origin + '/' };
+                
+                const blob = await imglyRemoveBackground(input.files[0], config);
+                document.getElementById('resultImage').src = URL.createObjectURL(blob);
+                document.getElementById('resultArea').classList.remove('hidden');
+                actions.style.display = 'flex';
+                currentBlob = blob;
+                status.classList.add('hidden');
+                processBtn.disabled = false;
+                processBtn.textContent = "Ganti Foto";
+            } catch (err) {
+                status.innerHTML = "Gagal: " + err.message;
+                processBtn.disabled = false;
+            }
+        };
+
+        document.getElementById('dlBtn').onclick = () => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(currentBlob);
+            a.download = "no-bg_" + currentFileName;
+            a.click();
+        };
+
+        document.getElementById('saveBtn').onclick = async () => {
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = "...";
+            
+            const reader = new FileReader();
+            reader.readAsDataURL(currentBlob);
+            reader.onloadend = async () => {
+                const res = await fetch('/api/save-to-github', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        imageBase64: reader.result,
+                        filename: "no-bg_" + currentFileName
+                    })
+                });
+                const data = await res.json();
+                document.getElementById('dbMsg').textContent = data.success ? "✅ Berhasil disimpan!" : "❌ Gagal: " + data.error;
+                saveBtn.textContent = "Simpan ke DB";
+                saveBtn.disabled = false;
+            };
+        };
+    </script>
+</body>
+</html>
