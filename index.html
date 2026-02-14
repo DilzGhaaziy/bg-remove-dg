@@ -51,8 +51,8 @@
     </div>
 
     <script type="module">
-    // Menggunakan './' untuk memastikan dia mengambil file yang tadi kamu cek
-    import imglyRemoveBackground from './imgly-background-removal.min.js';
+    // Menambahkan '/' di awal memastikan browser mencari di root, bukan folder relatif
+    import imglyRemoveBackground from '/imgly-background-removal.min.js';
 
     let currentBlob = null;
     let currentFileName = "";
@@ -65,7 +65,7 @@
         if (e.target.files[0]) {
             currentFileName = e.target.files[0].name;
             processBtn.disabled = false;
-            processBtn.textContent = "Proses Foto";
+            processBtn.innerHTML = '<i class="fas fa-magic"></i> Proses Sekarang';
         }
     };
 
@@ -74,24 +74,29 @@
         processBtn.disabled = true;
 
         try {
-            // Gunakan '/' agar dia mencari file .wasm di alamat utama
-            const config = { publicPath: '/' };
+            // Kita arahkan publicPath ke root agar dia menemukan file .wasm di tempat yang sama
+            const config = { 
+                publicPath: window.location.origin + '/' 
+            };
 
             const blob = await imglyRemoveBackground(input.files[0], config);
+            
             document.getElementById('resultImage').src = URL.createObjectURL(blob);
             document.getElementById('resultArea').classList.remove('hidden');
             document.getElementById('actions').style.display = 'flex';
+            
             currentBlob = blob;
             status.classList.add('hidden');
             processBtn.disabled = false;
+            processBtn.innerHTML = '<i class="fas fa-redo"></i> Ganti Foto';
         } catch (err) {
             console.error(err);
-            document.getElementById('statusText').textContent = "Error: " + err.message;
+            status.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Gagal: ${err.message}`;
             processBtn.disabled = false;
         }
     };
 
-    // ... (Tambahkan fungsi download dan save ke DB di bawah sini seperti sebelumnya)
+    // Fungsi Download & Save DB tetap sama seperti sebelumnya...
 </script>
 </body>
 </html>
